@@ -2,6 +2,7 @@ package com.example.testltech
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.os.AsyncTask
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.telephony.PhoneNumberFormattingTextWatcher
@@ -17,6 +18,8 @@ import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.android.synthetic.main.activity_login.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -27,11 +30,10 @@ import java.net.URLEncoder
 
 class LoginActivity : AppCompatActivity() {
 
-    @Volatile
-    var responseText:String?=null
-
     private val PHONE_MASK_REQUSET_LINK = "http://dev-exam.l-tech.ru/api/v1/phone_masks"
     private val AUTH_REQUSET_LINK = "http://dev-exam.l-tech.ru/auth.php"
+    private val PHONE_MASK_STRING = "phoneMask"
+    private val AUTH_STRING = "success"
 
     private lateinit var etPhone:EditText
     private lateinit var etPassword:EditText
@@ -49,7 +51,7 @@ class LoginActivity : AppCompatActivity() {
 
         btnSigin.setOnClickListener { v -> signIn(v) }
         checkConnection()
-        getPhoneMask()
+        DoPostGet().execute(PHONE_MASK_REQUSET_LINK)
 
 
     }
@@ -73,64 +75,73 @@ class LoginActivity : AppCompatActivity() {
         else Toast.makeText(this,"Network connection FAIL",Toast.LENGTH_LONG).show()
     }
 
-    fun getPhoneMask(){
+    fun getPhoneMask(_url:String):String?{
+        var responseText:String? = null
+        var count = 0
         if (isNetworkConnected()) {
-        var textView = textView
-
-          val async= object:Thread(Runnable {
-
-
-                var response:String?
-
-                val url =
-                    URL(PHONE_MASK_REQUSET_LINK)
-                do {
+            val url = URL(_url)
+            do {
+                count++
+                url.openConnection()
+                responseText = url.readText()
+            } while (responseText==null&&count<=20)
 
 
-
-                    try {
-                        val con = url.openConnection() as HttpURLConnection
-                        con.requestMethod="GET"
-                        val inString = BufferedReader(InputStreamReader(con.inputStream))
-                        var line = ""
-                        val response = StringBuffer()
-                        do {
-                            line=inString.readLine()
-                            response.append(line)
-                        }
-                        while (line!=null)
-
-                    } catch (ex: Exception) {
-
-
-
-                    }
-                } while (response == null)
-                responseText=response
-            }){}
-            async.start()
-            async.join(3000)
-            textView.setText(responseText.toString())
-
-            /*
-           val stringRequest = StringRequest(
-                Request.Method.GET, "http://dev-exam.l-tech.ru/api/v1/phone_masks",
-                Response.Listener{ response ->
-
-                    textView.setText(response.toString())
-                },
-                Response.ErrorListener { Toast.makeText(this,"Request FAIL",Toast.LENGTH_LONG).show() })
-
-            volleyQueue.add(stringRequest)*/
         }
+        return responseText
 
 
     }
 
     fun signIn(v: View){
         checkConnection()
-        getPhoneMask()
-        etPhone.setText(responseText)
+        getPhoneMask(PHONE_MASK_REQUSET_LINK)
+
 
     }
+
+    fun getAuth(url: String):String{
+        return ""
+    }
+
+    fun parseResponse(response:String):String{
+        //val responsetext = "{\"phoneMask\":\"+44 ХХХХ-ХХХХХХ\"}"
+
+        val gson = Gson()
+        val type = object :TypeToken<PhoneMask>(){}.type
+        val parsedResponse = gson.fromJson(response, type) as PhoneMask
+        val parsedResponseString = parsedResponse.phoneMask
+        return parsedResponseString
+    }
+
+    fun updatePhoneMask(s:String){
+        //etPhone.addText
+
+    }
+
+    fun updateAuth(s:String){
+
+    }
+
+    inner class DoPostGet : AsyncTask<String, Unit, String?>() {
+        override fun doInBackground(vararg params: String?): String? {
+            var responseText:String? = null
+            if (params.size!=0){
+            when (params[0]){
+                PHONE_MASK_REQUSET_LINK -> responseText = getPhoneMask(PHONE_MASK_REQUSET_LINK)
+                AUTH_REQUSET_LINK -> responseText = getAuth(AUTH_REQUSET_LINK)
+            }}
+            return responseText
+        }
+
+        override fun onPostExecute(result: String?) {
+            super.onPostExecute(result)
+            if (result!=null) {
+                //etPhone.setText(result)
+                updatePhoneMask(parseResponse(result))
+            }
+        }
+
+    }
+    data class PhoneMask(val phoneMask:String)
 }
