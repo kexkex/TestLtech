@@ -111,11 +111,22 @@ class LoginActivity : AppCompatActivity() {
         val type = object :TypeToken<PhoneMask>(){}.type
         val parsedResponse = gson.fromJson(response, type) as PhoneMask
         val parsedResponseString = parsedResponse.phoneMask
+
         return parsedResponseString
     }
 
     fun updatePhoneMask(s:String){
-        //etPhone.addText
+        etPhone.hint = s
+        when{
+            s.contains("+7") -> {etPhone.addTextChangedListener(PhoneNumberFormattingTextWatcher("RU"))
+                etPhone.setText("+7")}
+            s.contains("+44") -> {etPhone.addTextChangedListener(PhoneNumberFormattingTextWatcher("GB"))
+                etPhone.setText("+44")}
+            s.contains("+375") -> {etPhone.addTextChangedListener(PhoneNumberFormattingTextWatcher("BY"))
+                etPhone.setText("+375")}
+        }
+
+
 
     }
 
@@ -137,7 +148,7 @@ class LoginActivity : AppCompatActivity() {
         override fun onPostExecute(result: String?) {
             super.onPostExecute(result)
             if (result!=null) {
-                //etPhone.setText(result)
+
                 updatePhoneMask(parseResponse(result))
             }
         }
