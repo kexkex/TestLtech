@@ -1,20 +1,26 @@
 package com.example.testltech
 
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.os.AsyncTask
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.support.v7.app.AlertDialog
 import android.telephony.PhoneNumberFormattingTextWatcher
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
+import com.android.volley.Request
 import com.android.volley.RequestQueue
+import com.android.volley.Response
+import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+
 import java.io.*
 import java.net.HttpURLConnection
 import java.net.URL
@@ -31,20 +37,30 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var etPhone:EditText
     private lateinit var etPassword:EditText
     private lateinit var btnSigin:Button
-    private lateinit var volleyQueue:RequestQueue
+    private lateinit var volleyHttp: VolleyHttp
+
+
+    private var logged:Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        volleyQueue = Volley.newRequestQueue(this)
+        volleyHttp = VolleyHttp(this)
+
+
+
         etPhone = findViewById(R.id.etPhone)
         etPassword = findViewById(R.id.etPassword)
         btnSigin = findViewById(R.id.btnSignin)
 
         btnSigin.setOnClickListener { v -> signIn(v) }
         checkConnection()
-        DoGet().execute()
+
+        if (!readPhoneAndPassword()) {
+            DoGet().execute()
+           // updatePhoneMask(parseResponsePhoneMask(volleyHttp.getPhoneMask()))
+        } else logged = true
 
 
     }
@@ -71,12 +87,15 @@ class LoginActivity : AppCompatActivity() {
         var count = 0
         if (isNetworkConnected()) {
             val url = URL(_url)
+            val httpClient = url.openConnection() as HttpURLConnection
             do {
                 count++
-                url.openConnection()
+
                 responseText = url.readText()
 
+
             } while (responseText==null&&count<=5)
+            httpClient.disconnect()
 
 
         }
@@ -86,8 +105,23 @@ class LoginActivity : AppCompatActivity() {
     }
 
     fun signIn(v: View){
-        val doPost = DoPost()
-        doPost.execute(etPhone.text.toString(),etPassword.text.toString())
+        if (etPhone.text.isEmpty()||etPassword.text.isEmpty()){
+            val builder = AlertDialog.Builder(this)
+            builder.apply {
+                setTitle("Error")
+                setMessage("Enter phone and password")
+                setCancelable(false)
+                setNegativeButton("CLOSE", object: DialogInterface.OnClickListener {
+                    override fun onClick(dialog: DialogInterface?, which: Int) {
+                        dialog!!.cancel()
+                    }
+                })
+            }
+            val alert = builder.create()
+            alert.show()
+        }
+        //DoPost().execute(etPhone.text.toString(),etPassword.text.toString())
+        else updateAuth(true)
 
     }
 
@@ -95,43 +129,11 @@ class LoginActivity : AppCompatActivity() {
         var responseText:String? = null
         var count = 0
         if (isNetworkConnected()) {
-            val message = "phone=$phone&password=$password"
-            val url = URL(_url)
-            val con = url.openConnection() as HttpURLConnection
-                with(con){
-                    requestMethod = "POST"
-                    connectTimeout = 15000
-                    readTimeout = 15000
-                    doOutput = true
-                    doInput = true
-                    setRequestProperty("Content-Type","application/x-www-form-urlencoded")
+            val stringRequest = StringRequest(Request.Method.POST, _url,
+                Response.Listener<String>{
 
-                }
-
-            val postData: ByteArray = message.toByteArray(StandardCharsets.UTF_8)
-            try {
-                val outputStream = DataOutputStream(con.outputStream)
-                val writer = BufferedWriter(OutputStreamWriter(outputStream))
-                writer.write(message)
-                writer.flush()
-                writer.close()
-                outputStream.close()
-
-                val inputStream = DataInputStream(con.inputStream)
-                val reader = BufferedReader(InputStreamReader(inputStream))
-                responseText = con.responseMessage
-
-                do {
-                    count++
-
-
-            } while (responseText==null&&count<10)
-
-            } catch (exception: Exception) {} finally {
-                con.disconnect()
-            }
-
-
+                },
+                Response.ErrorListener { responseText = "That didn't work!" })
 
         }
         return responseText
@@ -174,12 +176,37 @@ class LoginActivity : AppCompatActivity() {
 
     fun updateAuth(auth:Boolean){
         if (auth) {
-            etPhone.setText(auth.toString())
-        } else {
-            etPhone.setText(auth.toString())
+            savePhoneAndPassword(etPhone.text.toString(),etPassword.text.toString())
+            val intent = Intent(this, MainActivity::class.java)
+            startActivity(intent)
        }
 
     }
+
+    fun savePhoneAndPassword(phone: String?, password: String?){
+        if (!logged) {
+            try {
+                var bufferedWriter = BufferedWriter(OutputStreamWriter(openFileOutput("log.ini", Context.MODE_PRIVATE)))
+                bufferedWriter.write("$phone\n$password")
+                bufferedWriter.close()
+            } catch (e: Exception) {
+            }
+        }
+    }
+
+    fun readPhoneAndPassword():Boolean{
+        try {
+            var bufferedReader = BufferedReader(InputStreamReader(openFileInput("log.ini")))
+            var str:String?=null
+            str = bufferedReader.readLine()
+            if (str!=null){
+                etPhone.setText(str)
+                etPassword.setText(bufferedReader.readLine())
+                return true
+            } else return false
+        } catch (e:Exception){ return false }
+    }
+
 
     inner class DoGet : AsyncTask<Unit, Unit, String?>() {
         override fun doInBackground(vararg params: Unit?): String? {
@@ -201,7 +228,6 @@ class LoginActivity : AppCompatActivity() {
             var responseText:String? = null
             if (params.size!=0){
                 responseText = getAuth(AUTH_REQUSET_LINK,params[0],params[1])
-
             }
             return responseText
         }
@@ -209,14 +235,10 @@ class LoginActivity : AppCompatActivity() {
         override fun onPostExecute(result: String?) {
             super.onPostExecute(result)
             if (result!=null) {
-
-
+                //updateAuth(parseResponseAuthAnswer(result))
+                updateAuth(true)
             }
-            //updateAuth(parseResponseAuthAnswer(result))
-            etPhone.setText(result)
         }
-
-
 
     }
     data class PhoneMask(val phoneMask:String)
