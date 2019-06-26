@@ -99,12 +99,14 @@ class LoginActivity : AppCompatActivity() {
 
     fun getAuth(_host: String, _path:String, phone: String?, password: String?):String?{
 
+        var phoneWithoutMask = phone?.substring(1)?.trim()
+
 
         val response = httpPost {
             host = _host
             path = _path
             body {
-                form("phone=$phone&password=$password")
+                form("phone=$phoneWithoutMask&password=$password")
             }
         }
         return response.asString()
