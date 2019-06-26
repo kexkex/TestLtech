@@ -13,31 +13,26 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
-import com.android.volley.Request
-import com.android.volley.RequestQueue
-import com.android.volley.Response
-import com.android.volley.toolbox.StringRequest
-import com.android.volley.toolbox.Volley
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import io.github.rybalkinsd.kohttp.dsl.httpPost
+import io.github.rybalkinsd.kohttp.ext.asString
+import io.github.rybalkinsd.kohttp.ext.httpGet
 
 import java.io.*
-import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.charset.StandardCharsets
+
 
 
 class LoginActivity : AppCompatActivity() {
 
     private val PHONE_MASK_REQUSET_LINK = "http://dev-exam.l-tech.ru/api/v1/phone_masks"
-    private val AUTH_REQUSET_LINK = "http://dev-exam.l-tech.ru/api/v1/auth"
-    private val PHONE_MASK_STRING = "phoneMask"
-    private val AUTH_STRING = "success"
+    private val AUTH_REQUSET_HOST = "dev-exam.l-tech.ru"
+    private val AUTH_REQUSET_PATH = "/api/v1/auth"
 
     private lateinit var etPhone:EditText
     private lateinit var etPassword:EditText
     private lateinit var btnSigin:Button
-    private lateinit var volleyHttp: VolleyHttp
+
 
 
     private var logged:Boolean = false
@@ -45,10 +40,6 @@ class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
-
-        volleyHttp = VolleyHttp(this)
-
-
 
         etPhone = findViewById(R.id.etPhone)
         etPassword = findViewById(R.id.etPassword)
@@ -59,14 +50,8 @@ class LoginActivity : AppCompatActivity() {
 
         if (!readPhoneAndPassword()) {
             DoGet().execute()
-           // updatePhoneMask(parseResponsePhoneMask(volleyHttp.getPhoneMask()))
+
         } else logged = true
-
-
-    }
-
-    override fun onResume() {
-        super.onResume()
     }
 
     private fun isNetworkConnected(): Boolean {
@@ -82,61 +67,47 @@ class LoginActivity : AppCompatActivity() {
         else Toast.makeText(this,"Network connection FAIL",Toast.LENGTH_LONG).show()
     }
 
-    fun getPhoneMask(_url:String):String?{
-        var responseText:String? = null
-        var count = 0
-        if (isNetworkConnected()) {
-            val url = URL(_url)
-            val httpClient = url.openConnection() as HttpURLConnection
-            do {
-                count++
+    fun getPhoneMaskKoHttp(url:String):String{
 
-                responseText = url.readText()
-
-
-            } while (responseText==null&&count<=5)
-            httpClient.disconnect()
-
-
-        }
-        return responseText
-
-
+        val response = url.httpGet()
+        return response!!.asString()!!
     }
 
     fun signIn(v: View){
-        if (etPhone.text.isEmpty()||etPassword.text.isEmpty()){
-            val builder = AlertDialog.Builder(this)
-            builder.apply {
-                setTitle("Error")
-                setMessage("Enter phone and password")
-                setCancelable(false)
-                setNegativeButton("CLOSE", object: DialogInterface.OnClickListener {
-                    override fun onClick(dialog: DialogInterface?, which: Int) {
-                        dialog!!.cancel()
-                    }
-                })
-            }
-            val alert = builder.create()
-            alert.show()
-        }
-        //DoPost().execute(etPhone.text.toString(),etPassword.text.toString())
-        else updateAuth(true)
+        if (etPhone.text.isEmpty()||etPassword.text.isEmpty())
+            showAlertDialogEmptyPass()
+
+        else DoPost().execute(etPhone.text.toString(),etPassword.text.toString())
 
     }
 
-    fun getAuth(_url: String, phone: String?, password: String?):String?{
-        var responseText:String? = null
-        var count = 0
-        if (isNetworkConnected()) {
-            val stringRequest = StringRequest(Request.Method.POST, _url,
-                Response.Listener<String>{
-
-                },
-                Response.ErrorListener { responseText = "That didn't work!" })
-
+    fun showAlertDialogEmptyPass(){
+        val builder = AlertDialog.Builder(this)
+        builder.apply {
+            setTitle("Error")
+            setMessage("Enter phone and password")
+            setCancelable(false)
+            setNegativeButton("CLOSE", object: DialogInterface.OnClickListener {
+                override fun onClick(dialog: DialogInterface?, which: Int) {
+                    dialog!!.cancel()
+                }
+            })
         }
-        return responseText
+        val alert = builder.create()
+        alert.show()
+    }
+
+    fun getAuth(_host: String, _path:String, phone: String?, password: String?):String?{
+
+
+        val response = httpPost {
+            host = _host
+            path = _path
+            body {
+                form("phone=$phone&password=$password")
+            }
+        }
+        return response.asString()
     }
 
     fun parseResponsePhoneMask(response:String):String{
@@ -169,9 +140,6 @@ class LoginActivity : AppCompatActivity() {
             s.contains("+375") -> {etPhone.addTextChangedListener(PhoneNumberFormattingTextWatcher("BY"))
                 etPhone.setText("+375")}
         }
-
-
-
     }
 
     fun updateAuth(auth:Boolean){
@@ -179,8 +147,25 @@ class LoginActivity : AppCompatActivity() {
             savePhoneAndPassword(etPhone.text.toString(),etPassword.text.toString())
             val intent = Intent(this, MainActivity::class.java)
             startActivity(intent)
-       }
+            finish()
+       } else showAlertDialogWrongPass()
 
+    }
+
+    fun showAlertDialogWrongPass(){
+        val builder = AlertDialog.Builder(this)
+        builder.apply {
+            setTitle("Error")
+            setMessage("Invalid phone or password")
+            setCancelable(false)
+            setNegativeButton("CLOSE", object: DialogInterface.OnClickListener {
+                override fun onClick(dialog: DialogInterface?, which: Int) {
+                    dialog!!.cancel()
+                }
+            })
+        }
+        val alert = builder.create()
+        alert.show()
     }
 
     fun savePhoneAndPassword(phone: String?, password: String?){
@@ -210,7 +195,7 @@ class LoginActivity : AppCompatActivity() {
 
     inner class DoGet : AsyncTask<Unit, Unit, String?>() {
         override fun doInBackground(vararg params: Unit?): String? {
-            var responseText:String? = getPhoneMask(PHONE_MASK_REQUSET_LINK)
+            var responseText:String? = getPhoneMaskKoHttp(PHONE_MASK_REQUSET_LINK)
 
             return responseText
         }
@@ -227,7 +212,7 @@ class LoginActivity : AppCompatActivity() {
         override fun doInBackground(vararg params: String?):String? {
             var responseText:String? = null
             if (params.size!=0){
-                responseText = getAuth(AUTH_REQUSET_LINK,params[0],params[1])
+                responseText = getAuth(AUTH_REQUSET_HOST, AUTH_REQUSET_PATH,params[0],params[1])
             }
             return responseText
         }
@@ -235,8 +220,7 @@ class LoginActivity : AppCompatActivity() {
         override fun onPostExecute(result: String?) {
             super.onPostExecute(result)
             if (result!=null) {
-                //updateAuth(parseResponseAuthAnswer(result))
-                updateAuth(true)
+                updateAuth(parseResponseAuthAnswer(result))
             }
         }
 

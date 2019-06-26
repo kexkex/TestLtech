@@ -1,8 +1,8 @@
 package com.example.testltech
 
-import android.content.Context
+
 import android.content.Intent
-import android.net.ConnectivityManager
+
 import android.os.AsyncTask
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -10,11 +10,14 @@ import android.support.v7.widget.DividerItemDecoration
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.view.Menu
+import android.view.MenuItem
 import android.widget.Button
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import java.net.HttpURLConnection
-import java.net.URL
+import io.github.rybalkinsd.kohttp.ext.asString
+import io.github.rybalkinsd.kohttp.ext.httpGet
+import java.util.*
+import kotlin.collections.ArrayList
 
 class MainActivity : AppCompatActivity(),MyAdapter.MyAdapterListener {
 
@@ -35,8 +38,6 @@ class MainActivity : AppCompatActivity(),MyAdapter.MyAdapterListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        setTitle("Main Activity")
-
         btnServerSort = findViewById(R.id.btnServerSort)
         btnDateSort = findViewById(R.id.btnDateSort)
 
@@ -44,8 +45,8 @@ class MainActivity : AppCompatActivity(),MyAdapter.MyAdapterListener {
         btnDateSort.setOnClickListener { v -> loadList(ORDER_BY_DATE) }
 
         list = arrayListOf()
-        sortOrder = ORDER_BY_SERVER
 
+        sortOrder = ORDER_BY_SERVER
         DoGetList().execute()
 
         viewManager = LinearLayoutManager(this)
@@ -56,7 +57,13 @@ class MainActivity : AppCompatActivity(),MyAdapter.MyAdapterListener {
             addItemDecoration(object: DividerItemDecoration(this@MainActivity,LinearLayoutManager.VERTICAL){})
             adapter = viewAdapter}
 
-        viewAdapter.notifyDataSetChanged()
+        val timer = Timer()
+        val timerTask = object :TimerTask(){
+            override fun run() {
+                loadList(sortOrder)
+            }
+        }
+        timer.schedule(timerTask, 5000, 30000)
 
 
     }
@@ -80,44 +87,30 @@ class MainActivity : AppCompatActivity(),MyAdapter.MyAdapterListener {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
         menuInflater.inflate(R.menu.menu_reload, menu)
-    return super.onCreateOptionsMenu(menu)}
+    return super.onCreateOptionsMenu(menu)
+    }
 
-    private fun isNetworkConnected(): Boolean {
+    override fun onOptionsItemSelected(item: MenuItem?): Boolean {
 
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networkInfo = connectivityManager.activeNetworkInfo
+        when (item!!.itemId){
+            R.id.mnReload -> loadList(sortOrder)
+        }
 
-        return networkInfo != null && networkInfo.isConnected
+
+        viewAdapter.notifyDataSetChanged()
+
+        return super.onOptionsItemSelected(item)
     }
 
     fun loadList(sort:String){
+        sortOrder = sort
         DoGetList().execute()
-        when (sort){
-            ORDER_BY_SERVER -> list.sortedBy { it.sort }
-            ORDER_BY_DATE -> list.sortedBy { it.date }
-
-        }
-
-        viewAdapter.notifyDataSetChanged()
     }
 
-    fun doGetList(_url:String):String?{
-        var responseText:String? = null
-        var count = 0
-        if (isNetworkConnected()) {
-            val url = URL(_url)
-            val httpClient = url.openConnection() as HttpURLConnection
-            do {
-                count++
-                url.openConnection()
-                responseText = url.readText()
+    fun doGetList(url:String):String?{
 
-            } while (responseText==null&&count<=65)
-            httpClient.disconnect()
-
-
-        }
-        return responseText
+        val response = url.httpGet()
+        return response!!.asString()!!
     }
 
     fun parseResponseList(response:String?):ArrayList<Element>{
@@ -138,13 +131,21 @@ class MainActivity : AppCompatActivity(),MyAdapter.MyAdapterListener {
 
         override fun onPostExecute(result: String?) {
             super.onPostExecute(result)
-            if (result!=null&&result.isNotEmpty())
-            list = parseResponseList(result)
-            viewAdapter.notifyDataSetChanged()
+            if (result!=null&&result.isNotEmpty()) {
+                list.clear()
+                list.addAll(parseResponseList(result))
+                when (sortOrder) {
+                    ORDER_BY_SERVER -> list.sortedBy { it.sort }
+                    ORDER_BY_DATE -> list.sortedBy { it.date }
+                }
+                viewAdapter.notifyDataSetChanged()
+            } else {
+                list.clear()
+                list.add(Element("0","Error","Loading","",0,"List"))
+                viewAdapter.notifyDataSetChanged()
+            }
         }
-
     }
-
 }
 
 

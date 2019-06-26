@@ -27,7 +27,6 @@ class ElementActivity : AppCompatActivity() {
                 Picasso.get().load("http://dev-exam.l-tech.ru"+bundle.getString("MainActImage")).into(ivImage)
             }
 
-
         } catch (ex: Exception) {
         }
     }
@@ -36,4 +35,6 @@ class ElementActivity : AppCompatActivity() {
         finish()
         super.onBackPressed()
     }
+
+
 }

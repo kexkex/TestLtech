@@ -13,13 +13,13 @@
             android:supportsRtl="true"
             android:theme="@style/AppTheme"
             android:usesCleartextTraffic="true">
-        <activity android:name=".ElementActivity">
+        <activity android:name=".ElementActivity" android:screenOrientation="portrait" android:label="See Element">
         </activity>
-        <activity android:name=".MainActivity">
+        <activity android:name=".MainActivity" android:screenOrientation="portrait" android:label="Your List">
         </activity>
         <activity
                 android:name=".LoginActivity"
-                android:theme="@style/Theme.AppCompat.NoActionBar">
+                android:screenOrientation="portrait" android:label="Please LogIn">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 
