@@ -135,8 +135,8 @@ class MainActivity : AppCompatActivity(),MyAdapter.MyAdapterListener {
                 list.clear()
                 list.addAll(parseResponseList(result))
                 when (sortOrder) {
-                    ORDER_BY_SERVER -> list.sortedBy { it.sort }
-                    ORDER_BY_DATE -> list.sortedBy { it.date }
+                    ORDER_BY_SERVER -> list.sortBy { it.sort }
+                    ORDER_BY_DATE -> list.sortBy { it.date }
                 }
                 viewAdapter.notifyDataSetChanged()
             } else {
